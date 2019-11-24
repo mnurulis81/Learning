@@ -505,6 +505,7 @@ s").option("user", "sqoopuser").option("password", "NHkkP876rp").option("partiti
 
 
 https://docs.cloudera.com/documentation/spark2/latest/topics/spark2_packaging.html#versions
+aaa
 
 
 
