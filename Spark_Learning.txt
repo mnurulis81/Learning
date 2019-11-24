@@ -1,0 +1,549 @@
+
+Note:
+RDD does not have structure / Dataframe has structure
+** export SPARK_MAJOR_VERSION=2 [TO START PYSPARK 2 VERSION IF BOTH EXISTS)
+
+
+______SQOOP_____________
+
+important about sqoop import all tables: when we do sqoop import all tables we have to use --warehouse-dir instead of --target-dir and also have to set mappers -m 1 (nof of mappers). If there primary key we can set more than one mappers
+
+
+
+-------------Cloudera VM----------------
+=>mysql -u root -p cloudera
+=> orderDF = sqlContext.read.format("jdbc").option("url", "jdbc:mysql://quickstart.cloudera:3306/retail_db").option("user", "root").option("password", "cloudera").option("dbtable", "orders").load()
+
+
+
+___________SPARK____________
+
+-----------copy file from local-------
+hadoop fs -put sparktext.txt(fileName)  /user/cloudera/retail_db/  (destination path)
+
+
+=> $ mysql -uroot -pcloudera (no space between -p and password)
+
+=> sqoop import --connect  "jdbc:mysql://quickstart.cloudera:3306/retail_db" --username root --password cloudera --table departments --as-textfile --target-dir retail_db/departmetnsnts --direct
+
+
+---------Read--open----Spark------------
+
+
+
+
+--------spark---------parrallelize---------------
+
+
+
+=>cust = sc.texFile("retail_db/customers/part-m-00000")
+=>cust_CA = cust.filter(lambda c: c.split(",")[7] == "CA") or c.split(",")[7]=="TX")
+=>cust_CA.count()
+=>for i in cust_CA.take(100) : print cust_CA
+
+
+=>cust = sc.texFile("retail_db/customers/part-m-00000")
+=>cust_CA = cust.filter(lambda c:
+ (c.split(",")[7] == "CA") or c.split(",")[7]=="TX") and c.split(",")[1][:4] =="Mary")
+
+=>for i in cust_CA.take(100) : print (i)
+
+
+-------------------------join-----------------
+
+=> orders = sc.texFile("retail_db/orders/part-m-00000")
+=> ordersMap = orders.map(lambda o:(int(o.split(",")[0],o.split(",")[1]))
+
+=> orderitems = sc.textFile("retail_db/order_items/part-m-00000")
+=> orderitemsMap = orderitems.map(lambda oi:(int(oi.split(",")[1],oi.split(",")[4]))
+
+=> orderJoin = ordersMap.join(orderitemsMap)
+
+=> for i in orderJoin.take(10):print(i)
+
+
+--------------------Outer Join--------------------
+
+=> orders = sc.texFile("retail_db/orders/part-m-00000")
+=> ordersMap = orders.map(lambda o:(int(o.split(",")[0],o.split(",")[1]))
+
+=> orderitems = sc.texFile("retail_db/order_items/part-m-00000")
+=> orderitemsMap = orderitems.map(lambda oi:(int(oi.split(",")[1],oi.split(",")[4]))
+
+=> LeftOuterJoin = ordersMap.leftOuterJoin(orderitemsMap)
+
+=> for i in LeftOuterJoin.take(100):print(i)
+
+
+-------------filter--------------subtotal----------------
+
+=>orderitems = sc.textFle("retail_db/order_items/part-m-00000")
+=>orderitemsfilter = orderitems.filter(lambda oi : int(oi.split(",)[1])==2)
+=> orderitemssubtotal = orderitemsfilter.map(lambda oi: float(oi(split(",")[4]))
+=>from operator import add
+=> orderitemsubtoal.reduce(add) 
+
+using lambda => orderitemsubtotal.redue (lambda x,y:x+y)
+
+--------------map-----filter------------
+
+file = sc.textFile("/user/cloudera/retail_db/purplecow.txt")
+fileU = file.map(lambda line : line.upper())
+filefilter = fileU.filter(lambda s: s.startswith('I'))
+
+
+-----------split---------distinct -------------------
+file = sc.textFile("/user/cloudera/retail_db/purplecow.txt")
+filesp = file.flatMap(lambda s: s.split()).distinct()
+for i in filesp.take(50) :
+... 	print i
+
+-----------sutract---------Union----------zip-------
+
+file1 = ["chicago","Boston","paris","San Francisco","Tokyo"]
+rdd1 = sc.parallelize(file1)
+
+file2 = ["San Francisco","Boston","Amerdam","Mumbai","McMurdo Station]
+rdd2 = sc.parallelize(file2)
+
+sub = rdd1.union(rdd2)
+zi = rdd1.zip(rdd2)
+uni = rdd1.union(rdd2)
+
+for i in uni.take(50) :
+... print i
+
+----------other RDD-----first-----top(n)-----for each-----
+file1 = ["chicago","Boston","paris","San Francisco","Tokyo"]
+rdd1 = sc.parallelize(file1)
+
+firstrdd = rdd1.first()
+tpn = rdd1.top(2)
+
+get positions wise  fields :
+firstrdd[0] -- will get first column
+firsrdd[:10] --- will get upto 10 columns
+firsrdd[2:10] -- starting from 3rd till 10
+firstrdd.split(",")
+firstrdd.split(",").[0] -- will get first element of array
+int(firstrdd.split(",").[0]) -- will convert first element to integer
+int(firstrdd.split(",").[1].split(" ")[0].replace("-"," ")) -- will replace "-" with empty string
+ 
+
+
+--------------mean ------sum-------
+
+first = [1,8,5,7]
+rdd1 = sc.parallelize(first)
+sum = rdd1.sum(first)
+mean = rdd1.mean()
+
+----------Essential Points-----
+ -RDDs can be created from files, parallelized data in memory, or other RDDs
+ -sc.textFile reads newline delimited text, one line per RDD record
+ -sc.wholeTextFile reads entire files into single RDD records
+ -Generic RDDs can consist of any type of data 
+-Generic RDDs provide a wide range of transformation operations
+
+------------ Pairs With Complex Values-----------
+
+sc.textFile(file) \ 
+.map(lambda line: line.split()) \ 
+.map(lambda fields: (fields[0],(fields[1],fields[2])))
+
+
+-------groupByKey------redueByKey----------
+
+=>orderItems = sc.textFile("/user/cloudera/retail_db/order_items")
+=>orderMap = orderItems.map(lambda oi: (int(oi.split(",")[1]),float(oi.split(",")[4])))
+=>ordergroup = orderMap.groupByKey()
+=>l = ordergroup.first()
+=>type(l)
+=>l[0]
+=>list(l[1])
+=>sum(l[1])
+
+=> revenueOrderId = ordgroup.map(lambda oi: (oi[0],sum(oi[1])))
+=> for i in revenueOrderId.take(10):print(i)
+
+-----reduceByKey----------------
+=> from operator import add
+=>orderItems = sc.textFile("/user/cloudera/retail_db/order_items")
+=>orderMap = orderItems.map(lambda oi: (int(oi.split(",")[1]),float(oi.split(",")[4])))
+=>revenueOrderId = orderMap.reduceByKey(add)
+
+
+=> from operator import add
+=>orderItems = sc.textFile("/user/cloudera/retail_db/order_items")
+=>orderMap = orderItems.map(lambda oi: (int(oi.split(",")[1]),float(oi.split(",")[4])))
+=>revenueOrderId = orderMap.reduceByKey(lambda x,y: x+y)
+
+
+------------aggregateByKey----------
+=> from operator import add
+=>orderItems = sc.textFile("/user/cloudera/retail_db/order_items")
+=>orderMap = orderItems.map(lambda oi: (int(oi.split(",")[1]),float(oi.split(",")[4])))
+=>revenuePerOrder  = orderMap.aggregateByKey((0.0,0),lambda x, y: (x[0] + y, x[1] +1),lambda x, y: (x[0] +y[0], x[1] +y[1]))
+
+----------set operations---------------
+=>orders  = sc.textFile("/user/cloudera/retail_db/orders")
+=>orderItems = sc.textFile("/user/cloudera/retail_db/order_items")
+=> orders201312 = orders.filter(lambda o: o.split(",")[1][:7] == "2013-12").map(lambda o: (int(int(o.split(",")[0]. o))
+=> orders201401 = orders.filter(lambda o: o.split(",")[1][:7] == "2014-01").map(lambda o: (int(int(o.split(",")[0]. o))
+
+=> orderItemMap = orderItems.map(lambda oi: (int(oi.split(",")[1]) , oi))
+
+=>orderItems201312 = orders201312.join(orderItemsMap).map(lambda oi: oi[1][1])
+=>orderItems201401 = orders201401.join(orderItemsMap).map(lambda oi: oi[1][1])
+
+=> products201312 = orderItems201312.map(lambda P: int(p.split(",")[2]))
+=> products201401 = orderItems201401.map(lambda P: int(p.split(",")[2]))
+=> productJoin = products201312.union(products201401).distinct()
+=> productJoin = products201312.intersection(products201401) --- distinct is implicit for intersection so no need to use intersection
+
+------revenue by product-----------
+=>orders  = sc.textFile("/user/cloudera/retail_db/orders")
+=>orderItems = sc.textFile("/user/cloudera/retail_db/order_items")
+=>ordersMap = orders.map(lambda o: (int(o.split(",")[0],o.split(",")[1]))
+=>orderItemsMap = orderItems.map(lambda oi: 
+		(int(oi.split(",")[1], (int(oi.split(","), float(oi.split(",")[4])))
+
+=> ordersJoin = orderMap.join(orderItemsMap)
+=> orderJoinMap = ordersJoin.map(lambda o: ((o[1][0], o[1][1][0], o[1][1][1]))
+=> from operator import add
+=>dailyRevenuePerProductId = ordersjoinMap.redueByKey(add)
+=> productsRaw = open("/data/retail_db/products/part-00000").read.splitlines()
+=> products = sc.parallelize(prodcutsRaw)
+
+----Daily Revenue----------------
+=>=>orders  = sc.textFile("/user/cloudera/retail_db/orders")
+=>orderItems = sc.textFile("/user/cloudera/retail_db/order_items")
+=>ordersFiltered = orders.\
+	filter(lambda o: o.split(",")[3] in ["COMPLETE","CLOSED"])
+=>ordersMap = ordersFiltered.
+	map(lambda o: (int(o.split(",")[0]), o.split(",")[1]))
+=>orderItemsMap = orderItems.map(lambda oi
+	(int(oi.split(",")[1], (int(oi.split(",")[2], float(oi.split(",")[4]))))
+orderJoin = ordersMap.join(orderItemsMap)
+ordersJoinMap = ordersJoin.\
+	map(lambda o: ((o[1][0], o[1][1][0], o[1][1][0]) o[1][1][1]))
+=> from operator import add
+=> dailyRevenuePerProductId = ordersJoinMap.reduceByKey(add)
+=productsRaw = open("/"/user/cloudera/retail_db/products/part-m-00000").read().splitlines()  -----------this code is not working. have to make sure how the path will be
+=> products = sc.parallelize(productsRaw)
+=> producsMap = products.\
+	map(lambda p: (int(p.split(",")[0], p.split(",")[2]))
+=> dailyRevenuePerProductIdMap = dailyRevenuePerProductId. \
+	map(lambda r: (r[0][1], (r[1])))
+=> dialyRevenuePerProductJoin = dailyRevenuePerProductIdMap.join(productsMap)
+=> dailyRevenue = dailyRevenuePerProductJoin. \
+	map(lambda t: ((t[1][0][0], -t[1][0][1]), (t[1][0][0], round(t[1][0][1],2), t[1][1])))
+
+=> dailyRevenuePerProductSorted = dailyRevenuePerProduct.sortByKey()
+=> dailyRevenuePerProductName = dailyRevenuePerProductSorted. \
+		map(lambda r: r[1])
+=> dailyRevenuePerProductNameDF = dailyRevenuePerProductName.\
+	coalesce(2). ........continue lecture video 161 , 5:28 minutes
+
+
+
+--------Spark SQL ----hive------------
+
+ To launch we can use spark-sql or hive (spark-sql is not available in cloudera vm)=
+
+_____HIVE_____________
+how to find hive path
+
+--> describe formatted 'tablename'
+
+-----Load data to hive table---------
+
+--> Load data local inpath '/data/retail_db/order_item' into table order_item
+
+=> describe "table name"
+=> describe formatted "table name"
+=> insert into table  "new table name" select * from "existing table"
+=> show functions ;
+=> describe function xpath -- here xpath is function name
+=>select length('hello world') -- function example
+--some important function
+substr or substring
+instr
+like
+rlike
+length
+lcase or lowercase
+ucase or upper
+initcap
+trim, ltrim , rtrim
+cast
+lpad,rpad
+split
+
+current_date
+current_timestamp
+date_add
+date_format
+date_sub
+datediff
+day
+dayofmonth
+to_date --convert to date from datetime
+to_unix_timestamp
+to_utc_timestamp
+from_utc_timestamp
+minute
+month
+months_between
+next_day
+
+case
+nvl
+concat
+
+
+
+--------------SQL in Pyspark  ---------------------
+
+=> sqlContext.sql("show databases").show()
+=> sqlContext.sql("show tables in retail_db").show()
+=> sqlContext.sql("select * from tablename").show()
+=> for i in sqlConext.sql("describe formatted products").collect():print (i)
+
+---------functions--------------
+connet to hive
+=> show functions;
+
+
+
+
+
+
+
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------Mapping Single Rows to Multiple Pairs --------------
+
+input data :
+00001  sku010:sku933:sku022 
+00002  sku912:sku331 
+00003  sku888:sku022:sku010:sku594 
+00004  sku411 
+
+output:
+(00001,sku010) 
+(00001,sku933) 
+(00001,sku022) 
+(00002,sku912) 
+(00002,sku331) 
+(00003,sku888) 
+
+code:
+ sc.textFile(file) \ 
+.map(lambda line: line.split('\t')) \ 
+.map(lambda fields: (fields[0],fields[1])) .flatMapValues(lambda skus: skus.split(':'))
+
+----------sqlContext.sql-----------pyspark------
+
+set -o vi
+pyspark --master yarn --conf spark.vi.port=12562 --executor-memory 2 --num-executors 1 
+
+
+---------DataFrame------
+orderDF = spark.read.csv("filePath")
+orderDF.printSchema()
+orderDF.show()
+orderDF.show(20) --limit the data 
+ordrDF.show(20,False) -- Not to truncate
+orderDF.describe()
+orderDF.describe().show
+
+
+RDD for DataFrame
+
+=> from pyspark.sql import Row
+=>orderRDD = sc.textFile("/user/binurul812385/orders")
+=>orderDF = orderRDD.map(lambda o: Row(o.split(",")[0],o.split(",")[1],o.split(",")[2])).toDF()
+=>orderDF = orderRDD.map(lambda o: Row(order_id = o.split(",")[0],order_date = o.split(",")[1],order_customer_id = o.split(",")[2],order_status =o.s
+plit(",")[3])).toDF()
+=>orderDF.show()
+
+=> orderDF.registerTempTable("orderDF_table") --Create temp table from data frame
+=> sqlContext.sql("select * from orderDF_table where order_status = 'CLOSED'").show()
+
+
+------------Local from HDFS-----------
+>>> from pyspark.sql import Row
+>>> productDF = productRDD.map(lambda p: Row(p.split(",")[0],p.split(",")[1],p.split(",")[2])).toDF()
+>>> productDF.registerTempTable("products_table")
+>>> sqlContext.sql("select * from products_table").show()
+
+
+
+------------Data Frame --------2x-----------
+
+=> orders = spark.read.text("/user/binurul812385/orders/part-m-00000")
+=> orders.show(10)
+=> orders.count()
+
+
+------------Workd Count Application------------
+RDD approch:
+>>>data = sc.textFile("/user/binurul812385/samplefile.txt")
+>>> wc = data.flatmap(lambda line : line.split(' ')).map(lambda word : (word,1)).reduceByKey(lambda x,y: x+y)
+>>> wc.map(lambda rec: rec[0]+','+str(rec[1])).saveAsTextFile('/user/binurul812385/wordcount')
+>>> 
+
+DataFrame approch
+>>> data = spark.read.text("/user/binurul812385/samplefile")
+>>> from pyspark.sql.functions import explode ,split
+>>> data
+>>> wc = data.select(explode(split(data.value, ' ')).alias('words')).groupBy('words').count()
+>>> wc.show()
+>>> wc.write.csv("/user/binurul812385/wordcount_df")
+
+
+------------DataFrame---------SQL Context-------------------
+
+>>> import pyspark
+>>> from pyspark.sql import SparkSession
+>>> spark = SparkSession.\
+...  builder. \
+...  appName('Reading data from text file').\
+...  master('local').\
+...  getOrCreate()
+
+>>> orderDF = spark.read.csv("/user/binurul812385/orders/part-m-00000")
+>> orderDF = spark.read.csv("/user/binurul812385/orders/part-m-00000").toDF('order_id','order_date','order_customer_id','Order_status')
+19/11/18 01:28:34 WARN DataSource: Error while looking for metadata directory.
+>>> orderDF.show()
+
+
+>>> orderDFF = spark.read.format('csv').option('sep',',').schema('order_id int,order_date date,order_customer_id int,order_status string').\
+... load('/user/binurul812385/orders')
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/hdp/current/spark2-client/python/pyspark/sql/readwriter.py", line 103, in schema
+    raise TypeError("schema should be StructType")
+TypeError: schema should be StructType
+
+>>> orderDF = spark.read.csv('/user/binurul812385/orders/part-m-00000',sep=',',schema='order_id int,order_date date, order_customer_id int,order_statu
+s string')
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/hdp/current/spark2-client/python/pyspark/sql/readwriter.py", line 377, in csv
+    maxMalformedLogPerPartition=maxMalformedLogPerPartition, mode=mode)
+  File "/usr/hdp/current/spark2-client/python/pyspark/sql/readwriter.py", line 54, in _set_opts
+    self.schema(schema)
+  File "/usr/hdp/current/spark2-client/python/pyspark/sql/readwriter.py", line 103, in schema
+    raise TypeError("schema should be StructType")
+TypeError: schema should be StructType
+
+----hive DataFrame---------------
+>>> spark.read.table("nurul_retail_db.products").show(10)
+>>> product.printSchema()
+>>> spark.sql("select * from product where shippinglocation = 'Delhi'").show()
+
+
+
+
+
+
+ 
+
+
+
+
+-------spark -hive- table ----DataFrame----------
+
+productDF = spark.read('nurul_retail_db.products)
+or spark.sql(select * from nurul_retail_db.products).show(10)
+
+
+------------spark---------Connecting to mysql--Scala---------------
+=>spark-shell --driver-class-path /usr/share/java/mysql-connector-java.jar
+>>>val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+scala> val orderDF = spark.read.format("jdbc").option("url", "jdbc:mysql://cxln2.c.thelab-240901.internal:3306/retail_db").option("dbtable", "orders")
+.option("password", "NHkkP876rp").option("user", "sqoopuser").load()
+
+
+-----------pyspark-------------Connecting--------------mysql---------------------
+
+[binurul812385@cxln4 ~]$ pyspark --driver-class-path /usr/share/java/mysql-connector-java.jar
+>>> orderDF = spark.read.format("jdbc").option("url", "jdbc:mysql://cxln2.c.thelab-240901.internal:3306/retail_db").option("dbtable", "orders").option("user", "sqoopuser").option("password", "NHkkP876rp").load()
+>>> orderDF.show()
+
+
+----
+>>> orderItemsDF = spark.read.format("jdbc").option("url", "jdbc:mysql://cxln2.c.thelab-240901.internal:3306/retail_db").option("dbtable", "order_item
+s").option("user", "sqoopuser").option("password", "NHkkP876rp").option("partitionColumn", "order_item_order_id").option("lowerBound", "10000").option
+("upperBound", "20000").option("numPartitions", "4").load()
+>>> orderItemsDF.show()
+>>> orderItemsDF.write.csv("/user/binurul812385/order_items_jdbc")
+
+** This partition columns should be primary key
+** numPartitions will divide total records Example here: (20000-100000)/4
+** First partition will have 1 to 12449
+**Last partition will have 17551 to all last
+
+
+
+----------
+
+
+https://docs.cloudera.com/documentation/spark2/latest/topics/spark2_packaging.html#versions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
